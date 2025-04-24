@@ -1,0 +1,43 @@
+
+
+services:
+  scraper:
+    build:
+      context: ./scraper
+    container_name: tarea1-sd-scraper
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/
+      - DB_NAME=waze_data
+    depends_on:
+      - mongo
+    volumes:
+      - ./scraper:/app
+    command: python scraper.py
+    stdin_open: true
+    tty: true
+
+  query:
+    build:
+      context: ./scraper
+    container_name: tarea1-sd-query
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/
+      - DB_NAME=waze_data
+    depends_on:
+      - mongo
+    volumes:
+      - ./scraper:/app
+    command: python query.py
+    stdin_open: true
+    tty: true
+
+  mongo:
+    image: mongo:5.0
+    container_name: tarea1-sd-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:
