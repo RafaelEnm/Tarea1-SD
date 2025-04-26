@@ -1,0 +1,11 @@
+{
+  "distribution": "zipf",
+  "cache_policy": "simple",
+  "cache_size": 200,
+  "total_queries": 1000,
+  "hits": 899,
+  "misses": 101,
+  "hit_rate": 0.899,
+  "avg_latency": 0.00042085838317871096,
+  "timestamp": "2025-04-26T02:56:50.950826"
+}

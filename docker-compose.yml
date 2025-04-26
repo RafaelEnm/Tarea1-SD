@@ -1,6 +1,23 @@
-
+version: '3.9'
 
 services:
+  mongo:
+    image: mongo:5.0
+    container_name: tarea1-sd-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: always
+
+  redis:
+    image: redis:latest
+    container_name: tarea1-sd-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--maxmemory", "100mb", "--maxmemory-policy", "allkeys-lru"]
+    restart: always
+
   scraper:
     build:
       context: ./scraper
@@ -22,22 +39,17 @@ services:
     container_name: tarea1-sd-query
     environment:
       - MONGO_URI=mongodb://mongo:27017/
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - DB_NAME=waze_data
     depends_on:
       - mongo
+      - redis
     volumes:
       - ./scraper:/app
-    command: python query.py
+    command: python cache_query.py
     stdin_open: true
     tty: true
-
-  mongo:
-    image: mongo:5.0
-    container_name: tarea1-sd-mongo
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
 
 volumes:
   mongo_data:
