@@ -51,5 +51,39 @@ services:
     stdin_open: true
     tty: true
 
+  simulate:
+    build:
+      context: ./scraper
+    container_name: tarea1-sd-simulate
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - mongo
+      - redis
+    volumes:
+      - ./scraper:/app
+    command: python simulate_cache_stress.py
+
+  api:
+    build:
+      context: ./scraper
+    container_name: tarea1-sd-api
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DB_NAME=waze_data
+    depends_on:
+      - mongo
+      - redis
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./scraper:/app
+    command: python server.py
+    restart: always
+
 volumes:
   mongo_data:

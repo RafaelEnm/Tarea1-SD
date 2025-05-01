@@ -15,5 +15,6 @@ COPY . .
 
 # Instala dependencias de Python
 RUN pip install --no-cache-dir pymongo redis requests matplotlib folium pandas
+RUN pip install --no-cache-dir pymongo redis requests matplotlib folium pandas flask
 
 CMD ["python", "scraper.py"]
