@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+    <property>
+        <n>dfs.webhdfs.enabled</n>
+        <value>true</value>
+    </property>
+    <property>
+        <n>dfs.permissions.enabled</n>
+        <value>false</value>
+    </property>
+    <property>
+        <n>dfs.replication</n>
+        <value>1</value>
+    </property>
+</configuration>
