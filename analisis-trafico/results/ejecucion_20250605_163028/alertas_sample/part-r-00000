@@ -1,0 +1,10 @@
+uuid,city,municipalityUser,type,street,,,,fecha
+000e956d-527d-49fa-8c00-97bda24adb2e,Estación Central,false,JAM,Aeropuerto,0.0,-70.711054,-33.467278,2025-04-14 18:54:35
+00142d76-c12d-4b99-98a5-8cfff5fdca27,Providencia,false,JAM,El Aguilucho,0.0,-70.600673,-33.443329,2025-04-22 18:02:20
+001b8f47-799d-42c0-a980-a14abeda7869,Santiago,false,JAM,Av. Libertador Bernardo O'Higgins,0.0,-70.663837,-33.446723,2025-04-15 18:01:55
+001df15a-18ea-460d-80ac-6f98154bf170,Quilicura,false,JAM,Av. Manuel Antonio Matta,0.0,-70.717155,-33.367323,2025-04-22 18:02:20
+0030020a-d4d0-478b-952a-8e92f5ded3c0,Quilicura,false,POLICE,Juan Larenas,0.0,-70.722805,-33.378776,2025-04-15 19:16:50
+00331f5b-685f-4cfd-9b4c-a3c02df1e001,Las Condes,false,JAM,Av. Presidente Sebastián Piñera Echenique,0.0,-70.557675,-33.414416,2025-04-23 18:53:40
+0041df08-528b-42b1-839a-9e8a39fb4721,Las Condes,false,JAM,Paul Harris,0.0,-70.532469,-33.387513,2025-04-15 18:01:55
+004b99e7-4a15-4067-a8b7-9de5a17aae57,Las Condes,false,JAM,Av. Alonso de Córdova,0.0,-70.577688,-33.405898,2025-04-22 18:02:20
+00537855-85cd-4628-89b8-c37f09ed9416,Maipú,false,JAM,Av. Pajaritos,0.0,-70.748416,-33.485594,2025-04-23 18:53:40
