@@ -1,28 +1,28 @@
-version: '3.9'
-
 services:
+  # Base de datos MongoDB sin autenticación
   mongo:
     image: mongo:5.0
-    container_name: tarea2-sd-mongo
+    container_name: tarea1-sd-mongo
     ports:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
-      - ./data/export:/export
     restart: always
 
+  # Redis
   redis:
     image: redis:latest
-    container_name: tarea2-sd-redis
+    container_name: tarea1-sd-redis
     ports:
       - "6379:6379"
     command: ["redis-server", "--maxmemory", "100mb", "--maxmemory-policy", "allkeys-lru"]
     restart: always
 
+  # Scraper principal
   scraper:
     build:
       context: ./scraper
-    container_name: tarea2-sd-scraper
+    container_name: tarea1-sd-scraper
     environment:
       - MONGO_URI=mongodb://mongo:27017/
       - DB_NAME=waze_data
@@ -30,15 +30,52 @@ services:
       - mongo
     volumes:
       - ./scraper:/app
-      - ./data/export:/export
+      - ./scraper/jsons:/app/jsons
     command: python scraper.py
     stdin_open: true
     tty: true
 
+  # Query service
+  query:
+    build:
+      context: ./scraper
+    container_name: tarea1-sd-query
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DB_NAME=waze_data
+    depends_on:
+      - mongo
+      - redis
+    volumes:
+      - ./scraper:/app
+    command: python cache_query.py
+    stdin_open: true
+    tty: true
+
+  # Simulation service
+  simulate:
+    build:
+      context: ./scraper
+    container_name: tarea1-sd-simulate
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DB_NAME=waze_data
+    depends_on:
+      - mongo
+      - redis
+    volumes:
+      - ./scraper:/app
+    command: python simulate_cache_stress.py
+
+  # API Server
   api:
     build:
       context: ./scraper
-    container_name: tarea2-sd-api
+    container_name: tarea1-sd-api
     environment:
       - MONGO_URI=mongodb://mongo:27017/
       - REDIS_HOST=redis
@@ -54,109 +91,23 @@ services:
     command: python server.py
     restart: always
 
-  # Hadoop NameNode
-  namenode:
-    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
-    container_name: tarea2-sd-namenode
-    restart: always
-    ports:
-      - "9870:9870"
-      - "9000:9000"
-    volumes:
-      - hadoop_namenode:/hadoop/dfs/name
-    environment:
-      - CLUSTER_NAME=test
-      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
-    env_file:
-      - ./hadoop.env
-
-  # Hadoop DataNode
-  datanode:
-    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
-    container_name: tarea2-sd-datanode
-    restart: always
-    volumes:
-      - hadoop_datanode:/hadoop/dfs/data
-    environment:
-      - SERVICE_PRECONDITION=namenode:9870
-      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
-    depends_on:
-      - namenode
-    env_file:
-      - ./hadoop.env
-
-  # Hadoop ResourceManager
-  resourcemanager:
-    image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
-    container_name: tarea2-sd-resourcemanager
-    restart: always
-    environment:
-      - SERVICE_PRECONDITION=namenode:9000 namenode:9870 datanode:9864
-    depends_on:
-      - namenode
-      - datanode
-    env_file:
-      - ./hadoop.env
-    ports:
-      - "8088:8088"
-
-  # Hadoop NodeManager
-  nodemanager1:
-    image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
-    container_name: tarea2-sd-nodemanager
-    restart: always
-    environment:
-      - SERVICE_PRECONDITION=namenode:9000 namenode:9870 datanode:9864 resourcemanager:8088
-    depends_on:
-      - namenode
-      - datanode
-      - resourcemanager
-    env_file:
-      - ./hadoop.env
-
-  # Contenedor personalizado con Pig
-  pig:
+  # Análisis de datos unificado (filtrado + procesamiento + visualización)
+  analisis_trafico:
     build:
-      context: ./pig
-    container_name: tarea2-sd-pig
-    restart: always
+      context: ./analisis-trafico
+    container_name: tarea1-sd-analisis-trafico
     volumes:
-      - ./scripts:/scripts
-      - ./data/export:/input
-      - ./data/output:/output
+      - ./analisis-trafico/data:/app/data
+      - ./analisis-trafico/results:/app/results
     environment:
-      - HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop
-      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
-    depends_on:
-      - namenode
-      - datanode
-      - resourcemanager
-      - nodemanager1
-    stdin_open: true
-    tty: true
-    command: tail -f /dev/null
-
-  # Servicio para exportar datos de Mongo a CSV
-  exporter:
-    build:
-      context: ./scraper
-    container_name: tarea2-sd-exporter
-    environment:
-      - MONGO_URI=mongodb://mongo:27017/
-      - DB_NAME=waze_data
-      - COLLECTION_NAME=waze_events
+      - MONGODB_URI=mongodb://mongo:27017/
+      - MONGODB_DB=waze_data
+      - MONGODB_COLECCION_ALERTAS=alertas
+      - MONGODB_COLECCION_ATASCOS=atascos
     depends_on:
       - mongo
-    volumes:
-      - ./scraper:/app
-      - ./data/export:/export
-    command: python export_to_csv.py
+    # Puedes ejecutar manualmente cuando necesites o comentar la línea siguiente para auto-ejecutar
+    # command: ./run.sh
 
 volumes:
   mongo_data:
-  hadoop_namenode:
-  hadoop_datanode:
-
-networks:
-  default:
-    driver: bridge
