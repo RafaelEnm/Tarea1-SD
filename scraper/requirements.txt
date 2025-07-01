@@ -1,0 +1,25 @@
+# Web scraping y requests
+requests==2.31.0
+beautifulsoup4==4.12.2
+selenium==4.15.0
+
+# Base de datos
+pymongo==4.6.1  # Versión actualizada y estable
+redis==4.3.4
+
+# API y servidor web
+flask==2.0.1
+werkzeug==2.0.1
+
+# Análisis de datos
+numpy==1.26.4
+pandas==2.0.3
+scipy==1.11.3
+
+# Visualización
+folium==0.15.1
+matplotlib==3.7.2
+
+# Utilidades
+python-dateutil==2.8.2
+pytz==2024.1

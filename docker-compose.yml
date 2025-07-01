@@ -1,0 +1,197 @@
+version: '3.8'
+
+services:
+  # --------------------------------------------------
+  # INFRASTRUCTURE SERVICES
+  # --------------------------------------------------
+  mongo:
+    image: mongo:latest
+    container_name: mongodb-general
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=admin123
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - app-network
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: mongo-express-general
+    ports:
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=admin
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=admin123
+      - ME_CONFIG_BASICAUTH_USERNAME=
+      - ME_CONFIG_BASICAUTH_PASSWORD=
+      - ME_CONFIG_MONGODB_SERVER=mongo
+    depends_on:
+      - mongo
+    networks:
+      - app-network
+
+  redis:
+    image: redis:6.0.7
+    container_name: redis-general # Renamed for consistency
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./scraper/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - app-network
+
+  redis_insight:
+    image: redislabs/redisinsight:1.14.0
+    container_name: redis-insight-general
+    restart: always
+    ports:
+      - "8001:8001"
+    networks:
+      - app-network
+  
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: elasticsearch-general
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+    networks:
+      - app-network
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    container_name: kibana-general
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - app-network
+
+  # --------------------------------------------------
+  # APPLICATION SERVICES (DATA PIPELINE)
+  # --------------------------------------------------
+  # Step 1.A: Load initial JSON files to MongoDB
+  json_loader:
+    build: ./scraper
+    container_name: json-loader-general
+    volumes:
+       - ./data/export:/app/data # Maps local data folder to container
+    environment:
+      - MONGODB_URI=mongodb://admin:admin123@mongo:27017/
+      - MONGODB_DB=trafico_rm
+      - MONGODB_COLECCION_ALERTAS=alertas
+      - MONGODB_COLECCION_ATASCOS=atascos
+      - OPERATION=load_json # Tells entrypoint.sh to run json_loader.py
+    depends_on:
+      - mongo
+    networks:
+      - app-network
+
+  # Step 1.B: Scrape new data from Waze
+  scraper:
+    build: ./scraper
+    container_name: waze-scraper-general # Renamed for consistency
+    volumes:
+      - ./data:/app/data
+    environment:
+      - MONGODB_URI=mongodb://admin:admin123@mongo:27017/
+      - MONGODB_DB=trafico_rm
+      - OPERATION=scrape # Tells entrypoint.sh to run waze_scraper.py
+    depends_on:
+      - mongo
+    networks:
+      - app-network
+
+  # API Server for receiving real-time data
+  api_server:
+    build: ./scraper
+    container_name: api-server-general
+    restart: on-failure
+    ports:
+      - "5000:5000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MONGO_URI=mongodb://admin:admin123@mongo:27017/
+      - MONGO_DB=trafico_rm
+      - OPERATION=server # Tells entrypoint.sh to run api_server.py
+    depends_on:
+      - mongo
+      - redis
+    networks:
+      - app-network
+
+  # Simulates traffic to the API
+  traffic_generator:
+    build: ./scraper
+    container_name: traffic-generator-general # Renamed for consistency
+    environment:
+      - API_HOST=api_server
+      - API_PORT=5000
+      - OPERATION=generate_traffic # Tells entrypoint.sh to run traffic_generator.py
+    depends_on:
+      - api_server
+    networks:
+      - app-network
+
+  # Step 2: Export from Mongo and filter data using Pig
+  filtering:
+    build: ./results
+    container_name: filtering-general
+    volumes:
+      - ./data/export:/app/data  # Input for filtering comes from here
+      - ./results/output:/app/results # Output of filtering goes here
+    environment:
+      - MONGODB_URI=mongodb://admin:admin123@mongo:27017/
+      - MONGODB_DB=trafico_rm
+      - OPERATION=filter # Tells entrypoint.sh to run mongo_exporter.py and then data_filter.pig
+    depends_on:
+      - mongo
+    networks:
+      - app-network
+
+  # Step 3: Process filtered data to generate aggregates and visualizations
+  processing:
+    build: ./results
+    container_name: processing-general
+    volumes:
+      - ./results/output:/app/input   # Input for processing is the output of filtering
+      - ./results/processed:/app/results # Final processed data and plots go here
+    environment:
+      - OPERATION=process # Tells entrypoint.sh to run data_aggregator.pig and data_visualizer.py
+    depends_on:
+      - filtering
+    networks:
+      - app-network
+
+  # Step 4: Upload processed data to Elasticsearch
+  uploader:
+    build: ./temporal_repo
+    container_name: uploader-general
+    volumes:
+      - ./results/processed:/app/input # Input for uploading is the output of processing
+    environment:
+      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTICSEARCH_PORT=9200
+    depends_on:
+      processing:
+        condition: service_completed_successfully
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongo_data:

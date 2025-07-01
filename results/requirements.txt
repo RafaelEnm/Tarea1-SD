@@ -1,0 +1,10 @@
+# Análisis de datos
+pandas==2.0.3
+numpy==1.24.4
+
+# Visualización
+matplotlib==3.7.2
+seaborn==0.12.2
+
+# Base de datos
+pymongo==4.6.1 
