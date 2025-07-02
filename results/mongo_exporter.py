@@ -3,6 +3,7 @@ import os
 import csv
 import pymongo
 from datetime import datetime
+import json
 
 def process_city(city):
     """Procesa el campo ciudad para formatear y reemplazar comas por punto y coma"""
@@ -30,7 +31,15 @@ def main():
     
     # Timestamp para archivos únicos y para el nombre de la carpeta
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = "/app/results"
+    
+    # =========================================================================
+    # ===================> CAMBIO CLAVE REALIZADO AQUÍ <===================
+    # =========================================================================
+    # El directorio de salida debe ser /app/data para que data_filter.pig lo encuentre.
+    output_dir = "/app/data"
+    # =========================================================================
+    # ======================= FIN DEL CAMBIO CLAVE ========================
+    # =========================================================================
     
     # Crear directorio base
     os.makedirs(output_dir, exist_ok=True)
@@ -42,7 +51,7 @@ def main():
     print(f"📁 Directorio de salida: {execution_dir}")
     
     # Exportar alertas
-    alertas_file = f"{execution_dir}/transformed_alerts_{timestamp}.csv"
+    alertas_file = os.path.join(execution_dir, f"transformed_alerta_{timestamp}.csv")
     alert_fields = [
         "uuid", "city", "municipalityUser", "type", 
         "street", "confidence", "location_x", "location_y", "fecha"
@@ -51,31 +60,37 @@ def main():
     with open(alertas_file, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(
             f, fieldnames=alert_fields, 
-            delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL
+            delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL,
+            extrasaction='ignore' # Ignorar campos extra que no están en la lista
         )
         writer.writeheader()
         alertas_count = 0
         
         for doc in db[alertas_collection].find({}, {'_id': 0}):
-            city = process_city(doc.get("city", ""))
             row = {
-                "uuid": doc.get("uuid", f"item_{alertas_count}"),
-                "city": city,
-                "municipalityUser": doc.get("reportByMunicipalityUser", ""),
-                "type": doc.get("type", ""),
-                "street": doc.get("street", ""),
-                "confidence": doc.get("confidence", 0),
-                "location_x": doc.get("location", {}).get("x", doc.get("x", 0)),
-                "location_y": doc.get("location", {}).get("y", doc.get("y", 0)),
-                "fecha": doc.get("fecha", "")
+                "uuid": doc.get("uuid"),
+                "city": process_city(doc.get("city")),
+                "municipalityUser": doc.get("reportByMunicipalityUser", doc.get("municipalityUser")),
+                "type": doc.get("type"),
+                "street": doc.get("street"),
+                "confidence": doc.get("confidence"),
+                "location_x": doc.get("location", {}).get("x"),
+                "location_y": doc.get("location", {}).get("y"),
+                "fecha": doc.get("pubMillis") # Usar pubMillis si existe, si no, el campo fecha
             }
+            # Unificar el campo de fecha, ya que los datos de Waze usan pubMillis
+            if 'pubMillis' in doc:
+                row['fecha'] = datetime.fromtimestamp(doc['pubMillis'] / 1000).strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                row['fecha'] = doc.get('fecha', '')
+                
             writer.writerow(row)
             alertas_count += 1
     
     print(f"✅ Exportadas {alertas_count} alertas")
     
     # Exportar atascos
-    atascos_file = f"{execution_dir}/transformed_jams_{timestamp}.csv"
+    atascos_file = os.path.join(execution_dir, f"transformed_atasco_{timestamp}.csv")
     jam_fields = [
         "uuid", "severity", "country", "length", "endnode", "roadtype", 
         "speed", "street", "fecha", "region", "city"
@@ -84,26 +99,30 @@ def main():
     with open(atascos_file, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(
             f, fieldnames=jam_fields, 
-            delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL
+            delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL,
+            extrasaction='ignore'
         )
         writer.writeheader()
         atascos_count = 0
         
         for doc in db[atascos_collection].find({}, {'_id': 0}):
-            city = process_city(doc.get("city", ""))
             row = {
-                "uuid": doc.get("uuid", f"item_{atascos_count}"),
-                "severity": doc.get("severity", ""),
-                "country": doc.get("country", ""),
-                "length": doc.get("length", ""),
-                "endnode": doc.get("endNode", ""),
-                "roadtype": doc.get("roadType", ""),
-                "speed": doc.get("speedKMH", doc.get("speed", "")),
-                "street": doc.get("street", ""),
-                "fecha": doc.get("fecha", ""),
-                "region": doc.get("region", ""),
-                "city": city
+                "uuid": doc.get("uuid"),
+                "severity": doc.get("severity"),
+                "country": doc.get("country"),
+                "length": doc.get("length"),
+                "endnode": doc.get("endNode"),
+                "roadtype": doc.get("roadType"),
+                "speed": doc.get("speedKMH", doc.get("speed")),
+                "street": doc.get("street"),
+                "region": doc.get("region"),
+                "city": process_city(doc.get("city"))
             }
+            if 'pubMillis' in doc:
+                row['fecha'] = datetime.fromtimestamp(doc['pubMillis'] / 1000).strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                row['fecha'] = doc.get('fecha', '')
+
             writer.writerow(row)
             atascos_count += 1
     
@@ -120,8 +139,7 @@ def main():
         "jams_file": atascos_file
     }
     
-    with open(f"{execution_dir}/export_summary.json", 'w') as f:
-        import json
+    with open(os.path.join(execution_dir, "export_summary.json"), 'w') as f:
         json.dump(summary, f, indent=2)
     
     print(f"📊 Resumen guardado en: {execution_dir}/export_summary.json")

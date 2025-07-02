@@ -35,7 +35,7 @@ services:
 
   redis:
     image: redis:6.0.7
-    container_name: redis-general # Renamed for consistency
+    container_name: redis-general
     restart: always
     ports:
       - "6379:6379"
@@ -100,7 +100,7 @@ services:
   # Step 1.B: Scrape new data from Waze
   scraper:
     build: ./scraper
-    container_name: waze-scraper-general # Renamed for consistency
+    container_name: waze-scraper-general
     volumes:
       - ./data:/app/data
     environment:
@@ -134,7 +134,7 @@ services:
   # Simulates traffic to the API
   traffic_generator:
     build: ./scraper
-    container_name: traffic-generator-general # Renamed for consistency
+    container_name: traffic-generator-general
     environment:
       - API_HOST=api_server
       - API_PORT=5000
@@ -179,13 +179,19 @@ services:
     build: ./temporal_repo
     container_name: uploader-general
     volumes:
-      - ./results/processed:/app/input # Input for uploading is the output of processing
+      # Montar tanto los datos procesados como acceso directo a MongoDB
+      - ./results/processed:/app/input # Datos procesados (CSV)
+      - ./results/output:/app/filtered # Datos filtrados si es necesario
     environment:
       - ELASTICSEARCH_HOST=elasticsearch
       - ELASTICSEARCH_PORT=9200
+      - MONGODB_URI=mongodb://admin:admin123@mongo:27017/
+      - MONGODB_DB=trafico_rm
+      - OPERATION=upload # Para el entrypoint.sh
     depends_on:
-      processing:
-        condition: service_completed_successfully
+      - processing
+      - elasticsearch
+      - mongo
     networks:
       - app-network
 
